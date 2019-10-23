@@ -40,8 +40,12 @@ CAM_BACK_X=1766
 CAM_BACK_Y=970
 CAM_ACCEPT_X=1768
 CAM_ACCEPT_Y=520
-GPU_RUN_X=1860
-GPU_RUN_Y=315
+CAM_SWITCH1_X=1602
+CAM_SWITCH1_Y=50
+CAM_SWITCH2_X=1602
+CAM_SWITCH2_Y=428
+GPU_RUN_X=990
+GPU_RUN_Y=147
 elif [[ "$CURRENT_W" -eq 1280 ]] && [[ "$CURRENT_H" -eq 720 ]];then
 SWIPE_X1=600
 SWIPE_X2=362
@@ -55,6 +59,10 @@ CAM_BACK_X=1177
 CAM_BACK_Y=646
 CAM_ACCEPT_X=1178
 CAM_ACCEPT_Y=346
+CAM_SWITCH1_X=1080
+CAM_SWITCH1_Y=30
+CAM_SWITCH2_X=1070
+CAM_SWITCH2_Y=261
 GPU_RUN_X=660
 GPU_RUN_Y=100
 fi
@@ -79,38 +87,85 @@ sleep 5
 adb exec-out screencap -p > test_bt_scan.png
 
 # Video Test
-adb shell cp -rv /mnt/media_rw/F556-9BAE/test_video/bbb_full.ffmpeg.1920x1080.mp4.libx265_6500kbps_30fps.libfaac_stereo_128kbps_48000Hz.mp4 /sdcard/Download/
+CHECK_AUDIO_DEV=$(adb shell cat /proc/asound/cards)
+
+if [[ "$CHECK_AUDIO_DEV" == "" ]];then
+  video_file=/mnt/media_rw/F556-9BAE/test_video/no-audio/Girl\ -\ 25029.mp4
+  SLEEP_TIME=3
+else
+  video_file=/mnt/media_rw/F556-9BAE/test_video/bbb_full.ffmpeg.1920x1080.mp4.libx265_6500kbps_30fps.libfaac_stereo_128kbps_48000Hz.mp4
+  SLEEP_TIME=10
+fi
+
+adb shell cp -rv "$video_file" /sdcard/Download/test.mp4
 sleep 30
-adb shell am start -a android.intent.action.VIEW -d "file:///sdcard/Download/bbb_full.ffmpeg.1920x1080.mp4.libx265_6500kbps_30fps.libfaac_stereo_128kbps_48000Hz.mp4" -t "video/*"
-sleep 10
+adb shell am start -a android.intent.action.VIEW -d "file:///sdcard/Download/test.mp4" -t "video/*"
+sleep "$SLEEP_TIME"
 adb exec-out screencap -p > test_vpu.png
-sleep 600
+sleep 60
 
 # GPU test
 adb install ./gpu-stress.apk
-adb shell am start -n com.android.gpu_emulation_stress_test/.MainActivity
-sleep 5
+adb shell am start -n com.kortenoeverdev.GPUbench/com.unity3d.player.UnityPlayerNativeActivity
+sleep 10
 adb shell input tap "$GPU_RUN_X" "$GPU_RUN_Y"
 sleep 30
 adb exec-out screencap -p > test_gpu.png
-sleep 120
+sleep 150
+adb exec-out screencap -p > test_gpu_result.png
 
 
 # Camera test
+
+if [[ "$(adb shell ls /dev/video0)" ]];then
+  if [[ "$(adb shell ls /dev/video1)" ]];then
+    CAM_NUM=2
+  else
+    CAM_NUM=1
+  fi
+else
+  CAM_NUM=0
+fi
+
+echo "Camera number is ""$CAM_NUM"
 adb shell "am start -a android.media.action.IMAGE_CAPTURE" && sleep 1
 
-for i in {1..100}
+for i in {1..2}
 do
   sleep 5
   adb shell input tap "$CAM_CAPTURE_X" "$CAM_CAPTURE_Y"
-  sleep 1
-  adb exec-out screencap -p > camera-capture_test-"$i".png
+  sleep 2
+  adb exec-out screencap -p > camera1-capture_test-"$i".png
   if [ "$i" -eq 10 ];then
     adb shell input tap "$CAM_ACCEPT_X" "$CAM_ACCEPT_Y"
   else
     adb shell input tap "$CAM_BACK_X" "$CAM_BACK_Y"
   fi
 done
+
+if [[ "$CAM_NUM" == "2" ]];then
+  pid=$(adb shell ps | grep camera2 | awk '{print $2}')
+  adb shell kill pid
+
+  adb shell "am start -a android.media.action.IMAGE_CAPTURE" && sleep 1
+  adb shell input tap "$CAM_SWITCH1_X" "$CAM_SWITCH1_Y"
+  sleep 1
+  adb shell input tap "$CAM_SWITCH2_X" "$CAM_SWITCH2_Y"
+
+  for i in {1..2}
+  do
+    sleep 5
+      adb shell input tap "$CAM_CAPTURE_X" "$CAM_CAPTURE_Y"
+      sleep 2
+      adb exec-out screencap -p > camera2-capture_test-"$i".png
+    if [ "$i" -eq 10 ];then
+      adb shell input tap "$CAM_ACCEPT_X" "$CAM_ACCEPT_Y"
+    else
+      adb shell input tap "$CAM_BACK_X" "$CAM_BACK_Y"
+    fi
+ done
+fi
+
 
 # Web Browser test (queen's music video from youtube)
 # Ethernet first
