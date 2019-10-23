@@ -89,8 +89,8 @@ adb exec-out screencap -p > test_bt_scan.png
 # Video Test
 CHECK_AUDIO_DEV=$(adb shell cat /proc/asound/cards)
 
-if [[ "$CHECK_AUDIO_DEV" == "" ]];then
-  video_file=/mnt/media_rw/F556-9BAE/test_video/no-audio/Girl\ -\ 25029.mp4
+if [[ "$(echo "$CHECK_AUDIO_DEV" | grep "no soundcards")" ]];then
+  video_file=/mnt/media_rw/F556-9BAE/test_video/no-audio/Girl.mp4
   SLEEP_TIME=3
 else
   video_file=/mnt/media_rw/F556-9BAE/test_video/bbb_full.ffmpeg.1920x1080.mp4.libx265_6500kbps_30fps.libfaac_stereo_128kbps_48000Hz.mp4
